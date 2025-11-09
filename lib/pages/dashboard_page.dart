@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -207,7 +208,15 @@ class _DashboardPageState extends State<DashboardPage> {
             tooltip: 'Logout',
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.account_circle_outlined, color: Colors.black),
+                    GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+            child: const Icon(Icons.account_circle_outlined, color: Colors.black),
+          ),
         ],
       ),
       body: SingleChildScrollView(
