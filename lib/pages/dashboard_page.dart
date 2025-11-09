@@ -5,6 +5,14 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'profile_page.dart';
+import 'pharmacy_page.dart';
+import 'lab_test_page.dart';
+import 'doctor_booking_page.dart';
+import 'insurance_page.dart';
+import 'select_page.dart';
+import 'health_records_page.dart';
+import 'circle_membership_page.dart';
+import 'appointment_history_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -288,13 +296,55 @@ class _DashboardPageState extends State<DashboardPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  dashboardItem(Icons.local_pharmacy, "Drepto\nPharmacy"),
-                  dashboardItem(Icons.bloodtype, "Lab-Test\n@ Home"),
-                  dashboardItem(Icons.medical_services, "Doctor\nBooking"),
-                  dashboardItem(Icons.verified_user, "Health\nInsurance"),
-                  dashboardItem(Icons.credit_card, "Drepto\nSELECT"),
-                  dashboardItem(Icons.folder, "Health\nRecords"),
-                  dashboardItem(Icons.group, "Circle\nMembership"),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PharmacyPage()),
+                    ),
+                    child: dashboardItem(Icons.local_pharmacy, "Drepto\nPharmacy"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LabTestPage()),
+                    ),
+                    child: dashboardItem(Icons.bloodtype, "Lab-Test\n@ Home"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DoctorBookingPage()),
+                    ),
+                    child: dashboardItem(Icons.medical_services, "Doctor\nBooking"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const InsurancePage()),
+                    ),
+                    child: dashboardItem(Icons.verified_user, "Health\nInsurance"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SelectPage()),
+                    ),
+                    child: dashboardItem(Icons.credit_card, "Drepto\nSELECT"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HealthRecordsPage()),
+                    ),
+                    child: dashboardItem(Icons.folder, "Health\nRecords"),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CircleMembershipPage()),
+                    ),
+                    child: dashboardItem(Icons.group, "Circle\nMembership"),
+                  ),
                   GestureDetector(
                     onTap: () => _navigateToHealthAssistant(context),
                     child: dashboardItem(Icons.smart_toy, "Health\nAssistant"),
