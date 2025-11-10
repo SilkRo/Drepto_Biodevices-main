@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:drepto_biodevices/pages/signup_page.dart';
+import 'package:drepto_biodevices/pages/dashboard_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:drepto_biodevices/api_service.dart';
+import 'package:drepto_biodevices/secure_storage_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,7 +18,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _agreeTerms = false;
   bool _loading = false;
   bool _passwordVisible = false;
+  String _selectedRole = 'user'; // Default role
   final _formKey = GlobalKey<FormState>();
+  final ApiService _apiService = ApiService();
 
   @override
   void dispose() {
@@ -34,28 +38,40 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => _loading = true);
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final result = await _apiService.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        _selectedRole,
       );
-    } on FirebaseAuthException catch (e) {
-      String msg = "Login failed";
-      if (e.code == 'user-not-found') msg = "No user found with this email";
-      if (e.code == 'wrong-password') msg = "Incorrect password";
-      if (e.code == 'invalid-email') msg = "Invalid email format";
-      if (e.code == 'network-request-failed') msg = "No internet connection";
+
+      // Assuming the API returns a token and a user object with an _id
+      final token = result['token'];
+      final userId = (result['user'] as Map<String, dynamic>)['_id'];
+
+      if (token != null && userId != null) {
+        await SecureStorageService.saveToken(token, userId);
+      } else {
+        throw Exception('Token or User ID is null');
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Something went wrong")),
+          SnackBar(content: Text('Login Failed: ${e.toString()}')),
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -86,22 +102,14 @@ class _LoginPageState extends State<LoginPage> {
                 return;
               }
 
-              try {
-                await FirebaseAuth.instance.sendPasswordResetEmail(
-                  email: emailController.text.trim(),
+              // TODO: Replace with your own password reset logic with your backend API.
+              await Future.delayed(const Duration(seconds: 1)); // Simulate network call
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("If an account exists, a password reset link has been sent.")),
                 );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Password reset email sent")),
-                  );
-                  Navigator.pop(context);
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Error sending reset email")),
-                  );
-                }
+                Navigator.pop(context);
               }
             },
             child: const Text("Send"),
@@ -175,6 +183,30 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+
+                // Role Selector
+                DropdownButtonFormField<String>(
+                  value: _selectedRole,
+                  decoration: InputDecoration(
+                    labelText: 'Role',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: ['user', 'nurse', 'authorized'].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (newValue) {
+                    setState(() {
+                      _selectedRole = newValue!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
 
                 // Email Field
                 TextFormField(

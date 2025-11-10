@@ -1,46 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
+import 'package:drepto_biodevices/api_service.dart';
+import 'package:drepto_biodevices/secure_storage_service.dart';
 
-// Nurse Model
+// Nurse Model adapted for API response
 class Nurse {
   final String id;
-  final String name;
+  final String firstName;
+  final String lastName;
   final String specialization;
-  final double rating;
-  final int experience;
-  final double fee;
-  final String imageUrl;
-  final List<String> services;
+  // Add other fields as per your API response, e.g., imageUrl, fee, etc.
 
   Nurse({
     required this.id,
-    required this.name,
+    required this.firstName,
+    required this.lastName,
     required this.specialization,
-    required this.rating,
-    required this.experience,
-    required this.fee,
-    required this.imageUrl,
-    required this.services,
   });
 
-  factory Nurse.fromFirestore(Map<String, dynamic> data, String id) {
+  factory Nurse.fromJson(Map<String, dynamic> json) {
     return Nurse(
-      id: id,
-      name: data['name'] ?? '',
-      specialization: data['specialization'] ?? 'General Nurse',
-      rating: (data['rating'] ?? 0.0).toDouble(),
-      experience: data['experience'] ?? 0,
-      fee: (data['fee'] ?? 0.0).toDouble(),
-      imageUrl: data['imageUrl'] ?? '',
-      services: List<String>.from(data['services'] ?? []),
+      id: json['_id'] ?? '',
+      firstName: json['firstName'] ?? '',
+      lastName: json['lastName'] ?? '',
+      specialization: json['specialization'] ?? 'General Nurse',
     );
   }
+
+  String get fullName => '$firstName $lastName';
 }
 
-// Enhanced Health Assistant Page
+// Health Assistant Page using ApiService
 class HealthAssistantPage extends StatefulWidget {
   const HealthAssistantPage({super.key});
 
@@ -59,52 +49,61 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   List<Nurse> _nurses = [];
   Nurse? _selectedNurse;
-  bool _isLoading = true;
+  bool _isLoadingNurses = true;
+  bool _isBooking = false;
+
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    _loadNurses();
-    _loadUserData();
+    _initializePage();
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    _symptomsController.dispose();
-    super.dispose();
+  Future<void> _initializePage() async {
+    await _loadUserData();
+    await _loadNurses();
   }
 
   Future<void> _loadUserData() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection("users").doc(user.uid).get();
-        if (userDoc.exists) {
-          setState(() {
-            _nameController.text = userDoc['displayName'] ?? '';
-            _phoneController.text = userDoc['phone'] ?? '';
-            _addressController.text = userDoc['address'] ?? '';
-          });
-        }
+      final token = await SecureStorageService.getToken();
+      final userId = await SecureStorageService.getUserId();
+      if (token != null && userId != null) {
+        final user = await _apiService.getSingleUser(userId, token);
+        setState(() {
+          _nameController.text = '${user['firstName']} ${user['lastName']}';
+          _phoneController.text = user['phoneNumber'] ?? '';
+          _addressController.text = user['address'] ?? '';
+        });
       }
     } catch (e) {
-      debugPrint("Error loading user data: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load user data: ${e.toString()}')),
+        );
+      }
     }
   }
 
   Future<void> _loadNurses() async {
+    setState(() => _isLoadingNurses = true);
     try {
-      QuerySnapshot querySnapshot = await FirebaseFirestore.instance.collection('nurses').where('isAvailable', isEqualTo: true).get();
-      setState(() {
-        _nurses = querySnapshot.docs.map((doc) => Nurse.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)).toList();
-        _isLoading = false;
-      });
+      final token = await SecureStorageService.getToken();
+      if (token != null) {
+        final nursesData = await _apiService.getAllNurses(token);
+        setState(() {
+          _nurses = nursesData.map((data) => Nurse.fromJson(data)).toList();
+          _isLoadingNurses = false;
+        });
+      }
     } catch (e) {
-      debugPrint("Error loading nurses: $e");
-      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load nurses: ${e.toString()}')),
+        );
+      }
+      setState(() => _isLoadingNurses = false);
     }
   }
 
@@ -127,28 +126,54 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
     }
   }
 
-  void _bookAppointment() {
-    if (_formKey.currentState!.validate() && _selectedNurse != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentPage(
-            appointmentData: AppointmentData(
-              patientName: _nameController.text,
-              phone: _phoneController.text,
-              address: _addressController.text,
-              symptoms: _symptomsController.text,
-              date: _selectedDate,
-              time: _selectedTime,
-              nurse: _selectedNurse!,
-            ),
-          ),
-        ),
-      );
-    } else if (_selectedNurse == null) {
+  Future<void> _bookAppointment() async {
+    if (!_formKey.currentState!.validate() || _selectedNurse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a nurse')),
+        const SnackBar(content: Text('Please fill all fields and select a nurse.')),
       );
+      return;
+    }
+
+    setState(() => _isBooking = true);
+
+    try {
+      final token = await SecureStorageService.getToken();
+      final userId = await SecureStorageService.getUserId();
+      if (token == null || userId == null) {
+        throw Exception('User not authenticated.');
+      }
+
+      final appointmentData = {
+        'patientId': userId,
+        'nurseId': _selectedNurse!.id,
+        'date': _selectedDate.toIso8601String(),
+        'time': _selectedTime.format(context),
+        'symptoms': _symptomsController.text,
+        'patientDetails': {
+          'name': _nameController.text,
+          'phone': _phoneController.text,
+          'address': _addressController.text,
+        }
+      };
+
+      await _apiService.createAppointment(appointmentData, token);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appointment booked successfully!')),
+        );
+        Navigator.of(context).pop(); // Go back to the dashboard
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to book appointment: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isBooking = false);
+      }
     }
   }
 
@@ -157,8 +182,8 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Book Nurse Appointment'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        backgroundColor: const Color(0xFF00897B),
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -188,7 +213,7 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                _buildPaymentButton(),
+                _buildBookingButton(),
               ],
             ),
           ),
@@ -222,17 +247,14 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
         decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8.0)),
         child: Row(
           children: [
-            CircleAvatar(
-              backgroundImage: _selectedNurse != null ? NetworkImage(_selectedNurse!.imageUrl) : null,
-              child: _selectedNurse == null ? const Icon(Icons.person) : null,
-            ),
+            const CircleAvatar(child: Icon(Icons.person)), // Placeholder icon
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_selectedNurse?.name ?? 'Select a Nurse', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  if (_selectedNurse != null) Text('${_selectedNurse!.specialization} - Exp: ${_selectedNurse!.experience} yrs'),
+                  Text(_selectedNurse?.fullName ?? 'Select a Nurse', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (_selectedNurse != null) Text(_selectedNurse!.specialization),
                 ],
               ),
             ),
@@ -244,31 +266,27 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   }
 
   void _showNurseSelectionDialog() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select a Nurse'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                  itemCount: _nurses.length,
-                  itemBuilder: (context, index) {
-                    final nurse = _nurses[index];
-                    return ListTile(
-                      leading: CircleAvatar(backgroundImage: NetworkImage(nurse.imageUrl)),
-                      title: Text(nurse.name),
-                      subtitle: Text('${nurse.specialization} - Exp: ${nurse.experience} yrs'),
-                      onTap: () {
-                        setState(() => _selectedNurse = nurse);
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  },
-                ),
-        ),
-      ),
+      builder: (context) {
+        return _isLoadingNurses
+            ? const Center(child: CircularProgressIndicator())
+            : ListView.builder(
+                itemCount: _nurses.length,
+                itemBuilder: (context, index) {
+                  final nurse = _nurses[index];
+                  return ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(nurse.fullName),
+                    subtitle: Text(nurse.specialization),
+                    onTap: () {
+                      setState(() => _selectedNurse = nurse);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              );
+      },
     );
   }
 
@@ -276,282 +294,31 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleMedium),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextButton(
           onPressed: onPressed,
-          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16), side: const BorderSide(color: Colors.grey)),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(value), const Icon(Icons.calendar_today)]),
+          child: Row(
+            children: [const Icon(Icons.calendar_today), const SizedBox(width: 8), Text(value)],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildPaymentButton() {
+  Widget _buildBookingButton() {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: _bookAppointment,
+        onPressed: _isBooking ? null : _bookAppointment,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          backgroundColor: const Color(0xFF00897B),
+          foregroundColor: Colors.white,
         ),
-        child: const Text('Proceed to Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-}
-
-// Data Models
-class AppointmentData {
-  final String patientName;
-  final String phone;
-  final String address;
-  final String symptoms;
-  final DateTime date;
-  final TimeOfDay time;
-  final Nurse nurse;
-
-  AppointmentData({
-    required this.patientName,
-    required this.phone,
-    required this.address,
-    required this.symptoms,
-    required this.date,
-    required this.time,
-    required this.nurse,
-  });
-}
-
-class PaymentData {
-  final String appointmentId;
-  final double amount;
-  final String nurseName;
-  final DateTime date;
-  final String patientName;
-
-  PaymentData({
-    required this.appointmentId,
-    required this.amount,
-    required this.nurseName,
-    required this.date,
-    required this.patientName,
-  });
-}
-
-// Payment Page
-class PaymentPage extends StatefulWidget {
-  final AppointmentData appointmentData;
-
-  const PaymentPage({super.key, required this.appointmentData});
-
-  @override
-  State<PaymentPage> createState() => _PaymentPageState();
-}
-
-class _PaymentPageState extends State<PaymentPage> {
-  String _selectedPaymentMethod = 'card';
-  bool _isProcessing = false;
-
-  Future<void> _processPayment() async {
-    setState(() {
-      _isProcessing = true;
-    });
-
-    try {
-      // Simulate payment processing
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Save appointment to Firebase
-      final appointmentId = await _saveAppointmentToFirebase();
-
-      // Send confirmation notification
-      await _sendConfirmationNotification(appointmentId);
-
-      // Show success dialog
-      _showSuccessDialog(appointmentId);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment failed: $e')),
-      );
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  Future<String> _saveAppointmentToFirebase() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not logged in');
-
-    final appointmentId = const Uuid().v4();
-    final appointmentData = {
-      'appointmentId': appointmentId,
-      'userId': user.uid,
-      'patientName': widget.appointmentData.patientName,
-      'phone': widget.appointmentData.phone,
-      'address': widget.appointmentData.address,
-      'symptoms': widget.appointmentData.symptoms,
-      'date': Timestamp.fromDate(widget.appointmentData.date),
-      'time': widget.appointmentData.time.format(context),
-      'nurseId': widget.appointmentData.nurse.id,
-      'nurseName': widget.appointmentData.nurse.name,
-      'nurseSpecialization': widget.appointmentData.nurse.specialization,
-      'fee': widget.appointmentData.nurse.fee,
-      'status': 'confirmed',
-      'paymentMethod': _selectedPaymentMethod,
-      'paymentStatus': 'paid',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    await FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(appointmentId)
-        .set(appointmentData);
-
-    return appointmentId;
-  }
-
-  Future<void> _sendConfirmationNotification(String appointmentId) async {
-    // In a real app, you would send this to your backend
-    // For demo, we'll just show a local notification
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      // Save notification to user's collection
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('notifications')
-          .add({
-        'title': 'Appointment Confirmed',
-        'body': 'Your nurse appointment with ${widget.appointmentData.nurse.name} has been confirmed for ${DateFormat('MMM dd, yyyy').format(widget.appointmentData.date)} at ${widget.appointmentData.time.format(context)}',
-        'type': 'appointment_confirmation',
-        'appointmentId': appointmentId,
-        'read': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  void _showSuccessDialog(String appointmentId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Payment Successful!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Appointment ID: $appointmentId'),
-              const SizedBox(height: 10),
-              Text('Nurse: ${widget.appointmentData.nurse.name}'),
-              Text('Date: ${DateFormat('MMM dd, yyyy').format(widget.appointmentData.date)}'),
-              Text('Time: ${widget.appointmentData.time.format(context)}'),
-              Text('Amount: \$${widget.appointmentData.nurse.fee}'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              child: const Text('Back to Home'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AppointmentDetailsPage(
-                      appointmentId: appointmentId,
-                    ),
-                  ),
-                );
-              },
-              child: const Text('View Details'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Payment'),
-        backgroundColor: const Color(0xFFFFF4EF),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Appointment Summary
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Appointment Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    const Divider(),
-                    ListTile(
-                      leading: CircleAvatar(backgroundImage: NetworkImage(widget.appointmentData.nurse.imageUrl)),
-                      title: Text(widget.appointmentData.nurse.name),
-                      subtitle: Text(widget.appointmentData.nurse.specialization),
-                      trailing: Text('\$${widget.appointmentData.nurse.fee}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Date: ${DateFormat('MMM dd, yyyy').format(widget.appointmentData.date)} at ${widget.appointmentData.time.format(context)}'),
-                    const SizedBox(height: 8),
-                    Text('Patient: ${widget.appointmentData.patientName}'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Payment Method
-            const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            RadioListTile<String>(
-              title: const Text('Credit/Debit Card'),
-              value: 'card',
-              groupValue: _selectedPaymentMethod,
-              onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
-            ),
-            RadioListTile<String>(
-              title: const Text('PayPal'),
-              value: 'paypal',
-              groupValue: _selectedPaymentMethod,
-              onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
-            ),
-            RadioListTile<String>(
-              title: const Text('Google Pay'),
-              value: 'google_pay',
-              groupValue: _selectedPaymentMethod,
-              onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
-            ),
-            const Spacer(),
-            // Process Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: _isProcessing
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _processPayment,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                      child: const Text('Pay Now', style: TextStyle(fontSize: 18, color: Colors.white)),
-                    ),
-            ),
-          ],
-        ),
+        child: _isBooking
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text('Confirm Booking'),
       ),
     );
   }
@@ -568,6 +335,7 @@ class AppointmentDetailsPage extends StatefulWidget {
 }
 
 class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
+  final ApiService _apiService = ApiService();
   Map<String, dynamic>? appointmentDetails;
   bool isLoading = true;
 
@@ -579,20 +347,13 @@ class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
 
   Future<void> _fetchAppointmentDetails() async {
     try {
-      DocumentSnapshot doc = await FirebaseFirestore.instance
-          .collection('appointments')
-          .doc(widget.appointmentId)
-          .get();
-      if (doc.exists) {
+      final token = await SecureStorageService.getToken();
+      if (token != null) {
+        final appointmentData = await _apiService.getAppointmentDetails(widget.appointmentId, token);
         setState(() {
-          appointmentDetails = doc.data() as Map<String, dynamic>;
+          appointmentDetails = appointmentData;
           isLoading = false;
         });
-      } else {
-        setState(() {
-          isLoading = false;
-        });
-        // Handle case where appointment is not found
       }
     } catch (e) {
       setState(() {
@@ -622,7 +383,7 @@ class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
                       ),
                       ListTile(
                         title: const Text('Patient Name'),
-                        subtitle: Text(appointmentDetails!['patientName']),
+                        subtitle: Text(appointmentDetails!['patientDetails']['name']),
                       ),
                       ListTile(
                         title: const Text('Nurse Name'),
@@ -630,9 +391,9 @@ class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
                       ),
                       ListTile(
                         title: const Text('Date & Time'),
-                        subtitle: Text('${appointmentDetails!['date'] is Timestamp ? DateFormat('MMM dd, yyyy').format((appointmentDetails!['date'] as Timestamp).toDate()) : ''} at ${appointmentDetails!['time']}'),
+                        subtitle: Text('${appointmentDetails!['date']} at ${appointmentDetails!['time']}'),
                       ),
-                       ListTile(
+                      ListTile(
                         title: const Text('Status'),
                         subtitle: Text(appointmentDetails!['status']),
                       ),

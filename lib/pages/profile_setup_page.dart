@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_page.dart';
 
 class ProfileSetupPage extends StatefulWidget {
@@ -29,39 +27,21 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Not logged in")),
-      );
-      return;
-    }
-
     setState(() => _saving = true);
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        "displayName": _displayNameController.text.trim(),
-        "address": _addressController.text.trim(),
-        "role": _selectedRole!.toLowerCase(),
-        "updatedAt": FieldValue.serverTimestamp(),
-        "isProfileComplete": true,
-      }, SetOptions(merge: true));
 
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      debugPrint("Error saving profile: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to save profile")),
+    // TODO: Replace with your own logic to save the profile to your backend.
+    // This is a placeholder that simulates a network request.
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        (route) => false,
       );
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
+
+    if (mounted) setState(() => _saving = false);
   }
 
   @override

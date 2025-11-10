@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:drepto_biodevices/pages/profile_setup_page.dart';
+import 'package:drepto_biodevices/pages/login_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:drepto_biodevices/api_service.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -16,6 +15,7 @@ class _SignupPageState extends State<SignupPage> {
   String _selectedRole = "Patient";
   String? _gender;
   final _formKey = GlobalKey<FormState>();
+  final ApiService _apiService = ApiService();
 
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
@@ -124,88 +124,56 @@ class _SignupPageState extends State<SignupPage> {
 
     setState(() => _loading = true);
 
-    try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+    // 1. Collect all data into a map
+    final userData = {
+      'firstName': _firstNameController.text.trim(),
+      'lastName': _lastNameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'mobileNumber': _phoneController.text.trim(),
+      'password': _passwordController.text.trim(),
+      'gender': _gender,
+      'role': _selectedRole,
+      // Add role-specific fields based on _selectedRole
+    };
 
-      final uid = cred.user!.uid;
-      await cred.user!.sendEmailVerification();
-
-      Map<String, dynamic> userData = {
-        "firstName": _firstNameController.text.trim(),
-        "lastName": _lastNameController.text.trim(),
-        "email": _emailController.text.trim(),
-        "phoneNumber": _phoneController.text.trim(),
-        "gender": _gender,
-        "createdAt": FieldValue.serverTimestamp(),
-        "updatedAt": FieldValue.serverTimestamp(),
-        "role": _selectedRole,
-      };
-
-      switch (_selectedRole) {
-        case "Patient":
-          userData.addAll({
-            "dateOfBirth": _birthDateController.text.trim(),
-            "address": _addressController.text.trim(),
-            "medicalHistory": _medicalHistoryController.text.trim(),
-          });
-          await FirebaseFirestore.instance.collection('patients').doc(uid).set(userData);
-          break;
-        case "Nurse":
-          userData.addAll({
-            "licenseNumber": _licenseNumberController.text.trim(),
-            "specialization": _specializationController.text.trim(),
-            "availability": _availabilityController.text.trim(),
-            "isAvailable": true,
-          });
-          await FirebaseFirestore.instance.collection('nurses').doc(uid).set(userData);
-          break;
-        case "Official":
-          userData.addAll({
-            "roleTitle": _officialRoleController.text.trim(),
-          });
-          await FirebaseFirestore.instance.collection('officials').doc(uid).set(userData);
-          break;
-      }
-
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'email': _emailController.text.trim(),
-        'role': _selectedRole,
-        'createdAt': FieldValue.serverTimestamp(),
+    if (_selectedRole == 'Patient') {
+      userData.addAll({
+        'dateOfBirth': _birthDateController.text.trim(),
+        'address': _addressController.text.trim(),
+        'medicalHistory': _medicalHistoryController.text.trim(),
       });
+    } else if (_selectedRole == 'Nurse') {
+      userData.addAll({
+        'licenseNumber': _licenseNumberController.text.trim(),
+        'specialization': _specializationController.text.trim(),
+        'availability': _availabilityController.text.trim(),
+      });
+    } else if (_selectedRole == 'Official') {
+      userData.addAll({
+        'roleTitle': _officialRoleController.text.trim(),
+      });
+    }
+
+    // 2. Call the API
+    try {
+      await _apiService.register(userData, _selectedRole);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Verification email sent. Please verify before login.")),
+          const SnackBar(content: Text('Registration successful! Please log in.')),
         );
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const ProfileSetupPage()),
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false, // This removes all previous routes
         );
       }
-    } on FirebaseAuthException catch (e) {
-      String msg;
-      switch (e.code) {
-        case 'email-already-in-use':
-          msg = "An account already exists for that email.";
-          break;
-        case 'invalid-email':
-          msg = "The email address is not valid.";
-          break;
-        case 'weak-password':
-          msg = "The password is too weak.";
-          break;
-        default:
-          msg = "Signup failed: ${e.message}";
-      }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      debugPrint("Signup error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("An unexpected error occurred: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration Failed: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:drepto_biodevices/api_service.dart';
+import 'package:drepto_biodevices/secure_storage_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -10,6 +10,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final ApiService _apiService = ApiService();
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
 
@@ -21,25 +22,24 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadUserProfile() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+      final token = await SecureStorageService.getToken();
+      final userId = await SecureStorageService.getUserId();
+
+      if (token != null && userId != null) {
+        final userData = await _apiService.getSingleUser(userId, token);
         setState(() {
-          _userData = userDoc.data();
+          _userData = userData;
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        throw Exception('User not authenticated.');
       }
     } catch (e) {
       setState(() => _isLoading = false);
       debugPrint('Error fetching profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load profile data.')),
+          SnackBar(content: Text('Failed to load profile data: ${e.toString()}')),
         );
       }
     }
@@ -81,7 +81,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 12),
         Text(
-          (_userData?['displayName'] ?? 'N/A').toString(),
+          '${_userData?['firstName'] ?? ''} ${_userData?['lastName'] ?? ''}',
           style: Theme.of(context)
               .textTheme
               .titleLarge
@@ -89,7 +89,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 4),
         Text(
-          (_userData?['email'] ?? FirebaseAuth.instance.currentUser?.email ?? 'N/A').toString(),
+          _userData?['email'] ?? 'N/A',
           style: Theme.of(context)
               .textTheme
               .bodyMedium
@@ -108,7 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             _row(Icons.badge_outlined, 'Role', _userData?['role'] ?? 'N/A'),
             const Divider(height: 24),
-            _row(Icons.phone_outlined, 'Phone', _userData?['phone'] ?? 'N/A'),
+            _row(Icons.phone_outlined, 'Phone', _userData?['phoneNumber'] ?? 'N/A'),
             const Divider(height: 24),
             _row(Icons.home_outlined, 'Address', _userData?['address'] ?? 'N/A'),
           ],
