@@ -42,7 +42,6 @@ class _SignupPageState extends State<SignupPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeTerms = false;
-  final bool _passwordVisible = false;
 
   @override
   void dispose() {

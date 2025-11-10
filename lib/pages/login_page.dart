@@ -49,9 +49,23 @@ class _LoginPageState extends State<LoginPage> {
       // Assuming the API returns a token and a user object with an _id
       final token = result['token'];
       final userId = (result['user'] as Map<String, dynamic>)['_id'];
+      final userData = result['user'] as Map<String, dynamic>;
+
+      print('🔑 Login - Token received: ${token?.substring(0, 20)}...');
+      print('🆔 Login - User ID: $userId');
+      print('👤 Login - User data: $userData');
 
       if (token != null && userId != null) {
         await SecureStorageService.saveToken(token, userId);
+        print('✅ Login - Token saved to storage');
+        
+        // Also save the user's profile data for quick access
+        await SecureStorageService.saveUserData(userData);
+        print('✅ Login - User data saved to storage');
+        print('✅ Login - Name: ${userData['firstName']} ${userData['lastName']}');
+        print('✅ Login - Email: ${userData['email']}');
+        print('✅ Login - Role: ${userData['role']}');
+        print('✅ Login - Address: ${userData['address']}');
       } else {
         throw Exception('Token or User ID is null');
       }
@@ -378,3 +392,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+

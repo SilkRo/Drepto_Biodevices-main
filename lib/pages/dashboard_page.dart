@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:drepto_biodevices/secure_storage_service.dart';
 import 'login_page.dart';
 import 'profile_page.dart';
 import 'pharmacy_page.dart';
@@ -23,6 +23,9 @@ class _DashboardPageState extends State<DashboardPage> {
   String userName = "User";
   String userAddress = "Some Address";
   String userRole = "Patient";
+  String userEmail = "";
+  String userPhone = "";
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -32,13 +35,33 @@ class _DashboardPageState extends State<DashboardPage> {
 
 
   Future<void> _loadUserProfile() async {
-    // TODO: Replace with your own logic to load the user profile from your backend.
-    // This is placeholder data.
-    setState(() {
-      userName = "Test User";
-      userAddress = "123 Flutter Lane";
-      userRole = "Patient";
-    });
+    try {
+      final userData = await SecureStorageService.getUserData();
+      print('📦 Dashboard - Fetched user data: $userData');
+      
+      if (userData != null) {
+        setState(() {
+          userName = userData['firstName'] ?? 'User'; // Only first name
+          userAddress = userData['address'] ?? 'No address';
+          userRole = userData['role'] ?? 'Patient';
+          userEmail = userData['email'] ?? '';
+          userPhone = userData['mobileNumber'] ?? '';
+          isLoading = false;
+        });
+        
+        print('✅ Dashboard - User Name: $userName');
+        print('✅ Dashboard - User Address: $userAddress');
+        print('✅ Dashboard - User Role: $userRole');
+        print('✅ Dashboard - User Email: $userEmail');
+        print('✅ Dashboard - User Phone: $userPhone');
+      } else {
+        print('⚠️ Dashboard - No user data found in storage');
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      print('❌ Dashboard - Error loading user profile: $e');
+      setState(() => isLoading = false);
+    }
   }
 
   void _navigateToHealthAssistant(BuildContext context) {
@@ -56,13 +79,21 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _signOut() async {
-    // TODO: Add any token clearing logic here.
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
+    try {
+      print('🚪 Logout - Starting logout process...');
+      await SecureStorageService.deleteAll();
+      print('✅ Logout - All data cleared from storage');
+      
+      if (mounted) {
+        print('✅ Logout - Navigating to login page');
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('❌ Logout - Error during logout: $e');
     }
   }
 
@@ -81,10 +112,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             TextButton(
               onPressed: () async {
-                await _signOut();
-                if (mounted) {
-                  Navigator.of(context).pop();
-                }
+                Navigator.of(context).pop(); // Close dialog first
+                await _signOut(); // Then sign out
               },
               child: const Text('Logout', style: TextStyle(color: Colors.red)),
             ),
@@ -101,19 +130,20 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF5F5F5),
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Namaste $userName",
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 18)),
-            if (userAddress.isNotEmpty)
-              Text(userAddress, style: const TextStyle(fontSize: 13)),
-            if (userRole.isNotEmpty)
-              Text("Role: $userRole",
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
+        title: isLoading
+            ? const Text("Loading...",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Namaste $userName",
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                  if (userRole.isNotEmpty)
+                    Text("Role: $userRole",
+                        style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                ],
+              ),
         actions: [
           IconButton(
             icon: const Icon(Icons.history, color: Colors.black),
@@ -325,6 +355,30 @@ class _DashboardPageState extends State<DashboardPage> {
               icon: Icon(Icons.science), label: "Lab Tests"),
           BottomNavigationBarItem(
               icon: Icon(Icons.health_and_safety), label: "Insurance"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? 'N/A' : value,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ),
         ],
       ),
     );
