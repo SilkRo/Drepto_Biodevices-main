@@ -46,28 +46,39 @@ class _LoginPageState extends State<LoginPage> {
         _selectedRole,
       );
 
-      // Assuming the API returns a token and a user object with an _id
-      final token = result['token'];
-      final userId = (result['user'] as Map<String, dynamic>)['_id'];
-      final userData = result['user'] as Map<String, dynamic>;
+      // Safely extract token, user map, and userId
+      final String? token = result['token'] as String?;
+      final dynamic userObj = result['user'];
+      final Map<String, dynamic>? userData =
+          (userObj is Map) ? Map<String, dynamic>.from(userObj as Map) : null;
+      String? userId = result['userId'] as String?; // prefer direct userId from API
+      userId ??= (userData?['_id'] ?? userData?['id'] ?? userData?['userId'] ?? userData?['uid']) as String?;
 
-      print('🔑 Login - Token received: ${token?.substring(0, 20)}...');
-      print('🆔 Login - User ID: $userId');
-      print('👤 Login - User data: $userData');
+      // Optional debug aid
+      if (result['raw'] != null) {
+        print('🐛 Login - Raw response: ${result['raw']}');
+      }
 
-      if (token != null && userId != null) {
-        await SecureStorageService.saveToken(token, userId);
-        print('✅ Login - Token saved to storage');
-        
-        // Also save the user's profile data for quick access
+      print('🔑 Login - Token received: ${token != null ? token.substring(0, token.length.clamp(0, 20)) : 'null'}');
+      print('🆔 Login - User ID: ${userId ?? 'null'}');
+      print('👤 Login - User data present: ${userData != null}');
+
+      if (token == null) {
+        throw Exception('Missing token in response');
+      }
+      if (userId == null) {
+        throw Exception('Missing user id in response');
+      }
+
+      await SecureStorageService.saveToken(token, userId);
+      print('✅ Login - Token and User ID saved to storage');
+
+      // Save the user's profile data only if available
+      if (userData != null) {
         await SecureStorageService.saveUserData(userData);
         print('✅ Login - User data saved to storage');
-        print('✅ Login - Name: ${userData['firstName']} ${userData['lastName']}');
-        print('✅ Login - Email: ${userData['email']}');
-        print('✅ Login - Role: ${userData['role']}');
-        print('✅ Login - Address: ${userData['address']}');
       } else {
-        throw Exception('Token or User ID is null');
+        print('ℹ️ Login - No user data in response to save');
       }
 
       if (mounted) {

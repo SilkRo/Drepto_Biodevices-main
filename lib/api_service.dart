@@ -39,11 +39,45 @@ class ApiService {
     // is returning a non-200 status code on successful login.
     // The backend should be fixed to return a 200 status code and a token.
     if (response.statusCode == 200 || responseBody['success'] == true) {
-      // Add a placeholder token if it's missing, so the app doesn't crash.
-      if (responseBody['token'] == null) {
-        responseBody['token'] = 'placeholder_token_backend_missing_it';
+      // Normalize possible shapes into a consistent map with 'token' and 'user'.
+      String? token = responseBody['token'] as String?;
+      if (token == null && responseBody is Map && responseBody['data'] is Map) {
+        final data = responseBody['data'] as Map;
+        token = data['token'] as String?;
       }
-      return responseBody;
+
+      dynamic userObj = responseBody['user'];
+      if (userObj == null && responseBody is Map && responseBody['data'] is Map) {
+        final data = responseBody['data'] as Map;
+        userObj = data['user'];
+      }
+
+      final Map<String, dynamic>? user =
+          (userObj is Map) ? Map<String, dynamic>.from(userObj as Map) : null;
+
+      // Try to extract a userId from multiple possible shapes
+      String? userId;
+      if (user != null) {
+        userId = (user['_id'] ?? user['id'] ?? user['userId'] ?? user['uid']) as String?;
+      }
+      if (userId == null && responseBody is Map) {
+        // Check top-level fields
+        userId = (responseBody['_id'] ?? responseBody['id'] ?? responseBody['userId'] ?? responseBody['uid']) as String?;
+      }
+      if (userId == null && responseBody is Map && responseBody['data'] is Map) {
+        final data = responseBody['data'] as Map;
+        userId = (data['_id'] ?? data['id'] ?? data['userId'] ?? data['uid']) as String?;
+      }
+
+      // Add a placeholder token if it's missing, so the app doesn't crash.
+      token ??= 'placeholder_token_backend_missing_it';
+
+      return {
+        'token': token,
+        'user': user,
+        'userId': userId,
+        'raw': responseBody,
+      };
     } else {
       // If the server did not return a 200 OK response,
       // throw an exception with the error message.
@@ -165,14 +199,43 @@ class ApiService {
 
   /// Fetches a list of all nurses.
   Future<List<dynamic>> getAllNurses(String token) async {
+    final uri = Uri.parse('$_baseUrl/Allnurse');
+    // Debug
+    print('GET $uri');
+
     final response = await http.get(
-      Uri.parse('$_baseUrl/Allnurse'),
+      uri,
       headers: _getAuthHeaders(token),
     );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to load nurses: ${response.body}');
+
+    // Debug
+    // print('Allnurse status: ${response.statusCode}');
+    // print('Allnurse body: ${response.body}');
+
+    dynamic body;
+    try {
+      body = jsonDecode(response.body);
+    } catch (_) {
+      body = response.body;
     }
+
+    if (response.statusCode == 200) {
+      if (body is List) return body;
+      if (body is Map && body['nurses'] is List) return body['nurses'] as List<dynamic>;
+      if (body is Map && body['data'] is List) return body['data'] as List<dynamic>;
+      if (body is Map && body['success'] == true && body['data'] is List) return body['data'] as List<dynamic>;
+      return [];
+    }
+
+    // Some backends return non-200 with success flag
+    if (body is Map && body['success'] == true) {
+      if (body['nurses'] is List) return body['nurses'] as List<dynamic>;
+      if (body['data'] is List) return body['data'] as List<dynamic>;
+    }
+
+    final message = (body is Map && body['message'] is String)
+        ? body['message'] as String
+        : 'HTTP ${response.statusCode}';
+    throw Exception('Failed to load nurses: $message');
   }
 }

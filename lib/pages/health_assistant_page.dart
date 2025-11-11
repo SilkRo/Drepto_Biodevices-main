@@ -10,6 +10,7 @@ class Nurse {
   final String lastName;
   final String specialization;
   final String gender;
+  final String availability; // e.g., 'Per Day', 'Per Week', 'Per Month'
   // Add other fields as per your API response, e.g., imageUrl, fee, etc.
 
   Nurse({
@@ -18,6 +19,7 @@ class Nurse {
     required this.lastName,
     required this.specialization,
     required this.gender,
+    required this.availability,
   });
 
   factory Nurse.fromJson(Map<String, dynamic> json) {
@@ -27,6 +29,7 @@ class Nurse {
       lastName: json['lastName'] ?? '',
       specialization: json['specialization'] ?? 'General Nurse',
       gender: json['gender'] ?? 'Female', // Defaulting to Female for example
+      availability: json['availability'] ?? 'Per Day',
     );
   }
 
@@ -57,9 +60,9 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   bool _isBooking = false;
 
   // Filter state
-  String? _selectedDuration = 'Per Day';
-  String? _selectedGender;
-  String? _selectedSpecialization;
+  String? _selectedDuration; // start with no duration filter
+  String? _selectedGender; // start with no gender filter
+  String? _selectedSpecialization; // start with no specialization filter
   List<String> _specializations = [
     'Nurse Practitioner (NP)',
     'Clinical Nurse Specialist (CNS)',
@@ -125,13 +128,41 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
     setState(() => _isLoadingNurses = true);
     try {
       final token = await SecureStorageService.getToken();
-      if (token != null) {
-        final nursesData = await _apiService.getAllNurses(token);
-        setState(() {
-          _nurses = nursesData.map((data) => Nurse.fromJson(data)).toList();
-          _applyFilters(); // Apply initial filters
-          _isLoadingNurses = false;
-        });
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+      final dynamic nursesData = await _apiService.getAllNurses(token);
+
+      // Normalize possible response shapes
+      List<dynamic> list;
+      if (nursesData is List) {
+        list = nursesData;
+      } else if (nursesData is Map && nursesData['nurses'] is List) {
+        list = nursesData['nurses'] as List<dynamic>;
+      } else if (nursesData is Map && nursesData['data'] is List) {
+        list = nursesData['data'] as List<dynamic>;
+      } else {
+        list = [];
+      }
+
+      // Debug
+      // ignore: avoid_print
+      print('Nurses fetched: count=${list.length}');
+      if (list.isNotEmpty) {
+        // ignore: avoid_print
+        print('Sample nurse: ${list.first}');
+      }
+
+      setState(() {
+        _nurses = list.map((data) => Nurse.fromJson(data as Map<String, dynamic>)).toList();
+        _applyFilters(); // Apply initial filters
+        _isLoadingNurses = false;
+      });
+
+      if (_nurses.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No nurses returned by the server.')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -165,9 +196,13 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   void _applyFilters() {
     setState(() {
       _filteredNurses = _nurses.where((nurse) {
-        final genderMatch = _selectedGender == null || nurse.gender.toLowerCase() == _selectedGender!.toLowerCase();
-        final specializationMatch = _selectedSpecialization == null || nurse.specialization == _selectedSpecialization;
-        return genderMatch && specializationMatch;
+        final genderMatch = _selectedGender == null ||
+            nurse.gender.toLowerCase() == _selectedGender!.toLowerCase();
+        final specializationMatch = _selectedSpecialization == null ||
+            nurse.specialization.toLowerCase().contains(_selectedSpecialization!.toLowerCase());
+        final durationMatch = _selectedDuration == null ||
+            nurse.availability.toLowerCase().contains(_selectedDuration!.toLowerCase());
+        return genderMatch && specializationMatch && durationMatch;
       }).toList();
       // Reset selected nurse if they are no longer in the filtered list
       if (_selectedNurse != null && !_filteredNurses.contains(_selectedNurse)) {
@@ -257,6 +292,23 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
                 _buildDurationFilter(),
                 const SizedBox(height: 16),
                 _buildSectionTitle('Filter Nurses'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox.shrink(),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedDuration = null;
+                          _selectedGender = null;
+                          _selectedSpecialization = null;
+                          _applyFilters();
+                        });
+                      },
+                      child: const Text('Clear filters'),
+                    ),
+                  ],
+                ),
                 _buildGenderFilter(),
                 const SizedBox(height: 16),
                 _buildSpecializationFilter(),
@@ -338,7 +390,7 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
                       return ListTile(
                         leading: const CircleAvatar(child: Icon(Icons.person)),
                         title: Text(nurse.fullName),
-                        subtitle: Text('${nurse.specialization} - ${nurse.gender}'),
+                        subtitle: Text('${nurse.specialization} • ${nurse.gender} • ${nurse.availability}'),
                         onTap: () {
                           setState(() => _selectedNurse = nurse);
                           Navigator.pop(context);
