@@ -123,6 +123,18 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Namaste $userName",
+                  Text("${_getGreeting()} $userName",
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 18)),
                   if (userRole.isNotEmpty)
@@ -185,7 +197,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 0),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
                   ),
                 ),
               ),

@@ -9,6 +9,7 @@ class Nurse {
   final String firstName;
   final String lastName;
   final String specialization;
+  final String gender;
   // Add other fields as per your API response, e.g., imageUrl, fee, etc.
 
   Nurse({
@@ -16,6 +17,7 @@ class Nurse {
     required this.firstName,
     required this.lastName,
     required this.specialization,
+    required this.gender,
   });
 
   factory Nurse.fromJson(Map<String, dynamic> json) {
@@ -24,6 +26,7 @@ class Nurse {
       firstName: json['firstName'] ?? '',
       lastName: json['lastName'] ?? '',
       specialization: json['specialization'] ?? 'General Nurse',
+      gender: json['gender'] ?? 'Female', // Defaulting to Female for example
     );
   }
 
@@ -48,9 +51,41 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   List<Nurse> _nurses = [];
+  List<Nurse> _filteredNurses = [];
   Nurse? _selectedNurse;
   bool _isLoadingNurses = true;
   bool _isBooking = false;
+
+  // Filter state
+  String? _selectedDuration = 'Per Day';
+  String? _selectedGender;
+  String? _selectedSpecialization;
+  List<String> _specializations = [
+    'Nurse Practitioner (NP)',
+    'Clinical Nurse Specialist (CNS)',
+    'Nurse Anesthetist (CRNA)',
+    'Nurse Midwife (CNM)',
+    'Pediatric Nurse',
+    'Neonatal Nurse',
+    'Geriatric Nurse',
+    'Family Nurse Practitioner (FNP)',
+    'Psychiatric Mental Health Nurse',
+    'Oncology Nurse',
+    'Cardiac Nurse',
+    'Orthopedic Nurse',
+    'Diabetes Management Nurse',
+    'Pain Management Nurse',
+    'Emergency Room (ER) Nurse',
+    'Trauma Nurse',
+    'Critical Care Nurse (ICU)',
+    'Surgical/Operating Room Nurse',
+    'Public Health Nurse',
+    'Nurse Educator',
+    'Nurse Researcher',
+    'Legal Nurse Consultant',
+    'Informatics Nurse',
+    'Travel Nurse',
+  ];
 
   final ApiService _apiService = ApiService();
 
@@ -94,6 +129,7 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
         final nursesData = await _apiService.getAllNurses(token);
         setState(() {
           _nurses = nursesData.map((data) => Nurse.fromJson(data)).toList();
+          _applyFilters(); // Apply initial filters
           _isLoadingNurses = false;
         });
       }
@@ -124,6 +160,20 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
     if (picked != null && picked != _selectedTime) {
       setState(() => _selectedTime = picked);
     }
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _filteredNurses = _nurses.where((nurse) {
+        final genderMatch = _selectedGender == null || nurse.gender.toLowerCase() == _selectedGender!.toLowerCase();
+        final specializationMatch = _selectedSpecialization == null || nurse.specialization == _selectedSpecialization;
+        return genderMatch && specializationMatch;
+      }).toList();
+      // Reset selected nurse if they are no longer in the filtered list
+      if (_selectedNurse != null && !_filteredNurses.contains(_selectedNurse)) {
+        _selectedNurse = null;
+      }
+    });
   }
 
   Future<void> _bookAppointment() async {
@@ -202,7 +252,15 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
                 const SizedBox(height: 24),
                 _buildSectionTitle('Appointment Details'),
                 _buildTextField(_symptomsController, 'Symptoms/Reason for Visit', maxLines: 3),
+                const SizedBox(height: 24),
+                _buildSectionTitle('Service Options'),
+                _buildDurationFilter(),
                 const SizedBox(height: 16),
+                _buildSectionTitle('Filter Nurses'),
+                _buildGenderFilter(),
+                const SizedBox(height: 16),
+                _buildSpecializationFilter(),
+                const SizedBox(height: 24),
                 _buildNurseSelector(),
                 const SizedBox(height: 24),
                 Row(
@@ -271,21 +329,23 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
       builder: (context) {
         return _isLoadingNurses
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
-                itemCount: _nurses.length,
-                itemBuilder: (context, index) {
-                  final nurse = _nurses[index];
-                  return ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
-                    title: Text(nurse.fullName),
-                    subtitle: Text(nurse.specialization),
-                    onTap: () {
-                      setState(() => _selectedNurse = nurse);
-                      Navigator.pop(context);
+            : _filteredNurses.isEmpty
+                ? const Center(child: Text('No nurses match the selected filters.'))
+                : ListView.builder(
+                    itemCount: _filteredNurses.length,
+                    itemBuilder: (context, index) {
+                      final nurse = _filteredNurses[index];
+                      return ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.person)),
+                        title: Text(nurse.fullName),
+                        subtitle: Text('${nurse.specialization} - ${nurse.gender}'),
+                        onTap: () {
+                          setState(() => _selectedNurse = nurse);
+                          Navigator.pop(context);
+                        },
+                      );
                     },
                   );
-                },
-              );
       },
     );
   }
@@ -303,6 +363,62 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDurationFilter() {
+    return Wrap(
+      spacing: 8.0,
+      children: ['Per Day', 'Per Week', 'Per Month'].map((duration) {
+        return ChoiceChip(
+          label: Text(duration),
+          selected: _selectedDuration == duration,
+          onSelected: (selected) {
+            setState(() {
+              _selectedDuration = selected ? duration : null;
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildGenderFilter() {
+    return Wrap(
+      spacing: 8.0,
+      children: ['Male', 'Female'].map((gender) {
+        return ChoiceChip(
+          label: Text(gender),
+          selected: _selectedGender == gender,
+          onSelected: (selected) {
+            setState(() {
+              _selectedGender = selected ? gender : null;
+              _applyFilters();
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSpecializationFilter() {
+    return DropdownButtonFormField<String>(
+      value: _selectedSpecialization,
+      hint: const Text('Select Specialization'),
+      isExpanded: true,
+      decoration: const InputDecoration(border: OutlineInputBorder()),
+      items: _specializations.map((String value) {
+        return DropdownMenuItem<String>(
+          value: value,
+          child: Text(value),
+        );
+      }).toList(),
+      onChanged: (newValue) {
+        setState(() {
+          _selectedSpecialization = newValue;
+          _applyFilters();
+        });
+      },
     );
   }
 

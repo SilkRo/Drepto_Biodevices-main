@@ -74,10 +74,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildHeader() {
     return Column(
       children: [
-        CircleAvatar(
+        const CircleAvatar(
           radius: 44,
-          backgroundColor: const Color(0xFFE0F2F1),
-          child: const Icon(Icons.person, size: 48, color: Color(0xFF00897B)),
+          backgroundColor: Color(0xFFE0F2F1),
+          child: Icon(Icons.person, size: 48, color: Color(0xFF00897B)),
         ),
         const SizedBox(height: 12),
         Text(

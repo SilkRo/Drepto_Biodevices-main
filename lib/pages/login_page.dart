@@ -97,7 +97,10 @@ class _LoginPageState extends State<LoginPage> {
         title: const Text("Reset Password"),
         content: TextField(
           controller: emailController,
-          decoration: const InputDecoration(hintText: "Enter your email"),
+          decoration: const InputDecoration(
+            hintText: "Enter your email",
+            border: OutlineInputBorder(),
+          ),
           keyboardType: TextInputType.emailAddress,
         ),
         actions: [
@@ -200,7 +203,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // Role Selector
                 DropdownButtonFormField<String>(
-                  value: _selectedRole,
+                  initialValue: _selectedRole,
                   decoration: InputDecoration(
                     labelText: 'Role',
                     prefixIcon: const Icon(Icons.person_outline),

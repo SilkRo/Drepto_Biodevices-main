@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'pages/login_page.dart';
-import 'pages/dashboard_page.dart';
-import 'pages/profile_setup_page.dart';
 import 'pages/splash_screen.dart';
 
 void main() {
@@ -23,6 +20,28 @@ class MyApp extends StatelessWidget {
           primary: const Color(0xFF00B2A9), // Matched from logo
           secondary: const Color(0xFF4A148C), // Deep Purple
           tertiary: const Color(0xFF00B2A9), // Complementary color for accents
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFBDBDBD)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF00897B), width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(

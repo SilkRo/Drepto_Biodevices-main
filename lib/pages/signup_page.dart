@@ -259,7 +259,6 @@ class _SignupPageState extends State<SignupPage> {
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
         ),
       ),
       items: ['Patient', 'Nurse', 'Official'].map((String value) {
@@ -333,7 +332,6 @@ class _SignupPageState extends State<SignupPage> {
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
         ),
       ),
       items: ['Male', 'Female', 'Other'].map((String value) {
@@ -411,7 +409,6 @@ class _SignupPageState extends State<SignupPage> {
           fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
           ),
         ),
         validator: validator ??
@@ -444,7 +441,6 @@ class _SignupPageState extends State<SignupPage> {
           fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
           ),
           suffixIcon: IconButton(
             icon: Icon(
