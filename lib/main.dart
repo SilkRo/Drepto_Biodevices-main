@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:drepto_biodevices/secure_storage_service.dart';
 
 import 'pages/splash_screen.dart';
 
@@ -218,14 +219,21 @@ class MyApp extends StatelessWidget {
             Positioned(
               right: 16,
               bottom: bottomOffset,
-              child: FloatingActionButton.extended(
-                heroTag: 'globalChatbotFab',
-                backgroundColor: const Color(0xFF00897B),
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Support'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ChatSupportPage()),
+              child: FutureBuilder<String?>(
+                future: SecureStorageService.getToken(),
+                builder: (context, snapshot) {
+                  final hasToken = snapshot.connectionState == ConnectionState.done && snapshot.data != null;
+                  if (!hasToken) return const SizedBox.shrink();
+                  return FloatingActionButton.extended(
+                    heroTag: 'globalChatbotFab',
+                    backgroundColor: const Color(0xFF00897B),
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Support'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ChatSupportPage()),
+                      );
+                    },
                   );
                 },
               ),
