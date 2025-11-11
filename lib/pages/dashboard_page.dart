@@ -254,53 +254,53 @@ class _DashboardPageState extends State<DashboardPage> {
                       context,
                       MaterialPageRoute(builder: (context) => const PharmacyPage()),
                     ),
-                    child: dashboardItem(Icons.local_pharmacy, "Drepto\nPharmacy"),
+                    child: dashboardItem(Icons.shopping_cart, "MediShop"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const LabTestPage()),
                     ),
-                    child: dashboardItem(Icons.bloodtype, "Lab-Test\n@ Home"),
+                    child: dashboardItem(Icons.science, "HomeLab"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const DoctorBookingPage()),
                     ),
-                    child: dashboardItem(Icons.medical_services, "Doctor\nBooking"),
+                    child: dashboardItem(Icons.calendar_month, "Doctor\nAppointment"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const InsurancePage()),
                     ),
-                    child: dashboardItem(Icons.verified_user, "Health\nInsurance"),
+                    child: dashboardItem(Icons.health_and_safety, "Health\nInsurance"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const SelectPage()),
                     ),
-                    child: dashboardItem(Icons.credit_card, "Drepto\nSELECT"),
+                    child: dashboardItem(Icons.storefront, "Drepto\nProducts"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const HealthRecordsPage()),
                     ),
-                    child: dashboardItem(Icons.folder, "Health\nRecords"),
+                    child: dashboardItem(Icons.history, "History"),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const CircleMembershipPage()),
                     ),
-                    child: dashboardItem(Icons.group, "Circle\nMembership"),
+                    child: dashboardItem(Icons.family_restroom, "Family\nShare"),
                   ),
                   GestureDetector(
                     onTap: () => _navigateToHealthAssistant(context),
-                    child: dashboardItem(Icons.smart_toy, "Health\nAssistant"),
+                    child: dashboardItem(Icons.medical_information, "Nurse\nAppointment"),
                   ),
                 ],
               ),
