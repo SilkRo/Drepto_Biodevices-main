@@ -50,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
       final String? token = result['token'] as String?;
       final dynamic userObj = result['user'];
       final Map<String, dynamic>? userData =
-          (userObj is Map) ? Map<String, dynamic>.from(userObj as Map) : null;
+          (userObj is Map) ? Map<String, dynamic>.from(userObj) : null;
       String? userId = result['userId'] as String?; // prefer direct userId from API
       userId ??= (userData?['_id'] ?? userData?['id'] ?? userData?['userId'] ?? userData?['uid']) as String?;
 

@@ -53,7 +53,7 @@ class ApiService {
       }
 
       final Map<String, dynamic>? user =
-          (userObj is Map) ? Map<String, dynamic>.from(userObj as Map) : null;
+          (userObj is Map) ? Map<String, dynamic>.from(userObj) : null;
 
       // Try to extract a userId from multiple possible shapes
       String? userId;

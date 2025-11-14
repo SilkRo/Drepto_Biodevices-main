@@ -63,31 +63,10 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
   String? _selectedDuration; // start with no duration filter
   String? _selectedGender; // start with no gender filter
   String? _selectedSpecialization; // start with no specialization filter
-  List<String> _specializations = [
-    'Nurse Practitioner (NP)',
-    'Clinical Nurse Specialist (CNS)',
-    'Nurse Anesthetist (CRNA)',
-    'Nurse Midwife (CNM)',
-    'Pediatric Nurse',
-    'Neonatal Nurse',
-    'Geriatric Nurse',
-    'Family Nurse Practitioner (FNP)',
-    'Psychiatric Mental Health Nurse',
-    'Oncology Nurse',
-    'Cardiac Nurse',
-    'Orthopedic Nurse',
-    'Diabetes Management Nurse',
-    'Pain Management Nurse',
-    'Emergency Room (ER) Nurse',
-    'Trauma Nurse',
-    'Critical Care Nurse (ICU)',
-    'Surgical/Operating Room Nurse',
-    'Public Health Nurse',
-    'Nurse Educator',
-    'Nurse Researcher',
-    'Legal Nurse Consultant',
-    'Informatics Nurse',
-    'Travel Nurse',
+  final List<String> _specializations = [
+    'General Nurse',
+    'Surgeon Nurse',  
+    'ICU Nurse'
   ];
 
   final ApiService _apiService = ApiService();
@@ -455,7 +434,7 @@ class _HealthAssistantPageState extends State<HealthAssistantPage> {
 
   Widget _buildSpecializationFilter() {
     return DropdownButtonFormField<String>(
-      value: _selectedSpecialization,
+      initialValue: _selectedSpecialization,
       hint: const Text('Select Specialization'),
       isExpanded: true,
       decoration: const InputDecoration(border: OutlineInputBorder()),
